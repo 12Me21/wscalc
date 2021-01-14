@@ -3,9 +3,17 @@ local INFIX = {
 	["-"]=function(a,b) return a-b end,
 	["*"]=function(a,b) return a*b end,
 	["/"]=function(a,b) return a/b end,
+	["%"]=function(a,b) return a%b end,
+	["^"]=function(a,b) return a^b end,
+	["~"]=function(a,b) return a//1~b//1 end,
+	["&"]=function(a,b) return a//1&b//1 end,
+	["|"]=function(a,b) return a//1|b//1 end,
+	[">>"]=function(a,b) return a//1>>b//1 end,
+	["<<"]=function(a,b) return a//1>>b//1 end,
 }
 local PREFIX = {
 	["-"]=function(a) return -a end,
+	["~"]=function(a) return ~(a//1) end,
 }
 function search(str, map)
 	for k,v in pairs(map) do
@@ -15,8 +23,10 @@ end
 
 function readExpr(str, depth)
 	local acc, str = readValue(str, depth)
+	return readAfter(str, depth, acc)
+end
 
-	::again::
+function readAfter(str, depth, acc)
 	if str:sub(1,1)==" " then -- end group
 		str = str:sub(2)
 		if depth>0 then return acc, str end
@@ -27,8 +37,7 @@ function readExpr(str, depth)
 	if op then
 		local v
 		v, str = readValue(str:sub(#op+1), depth)
-		acc = f(acc, v)
-		goto again
+		return readAfter(str, depth, f(acc, v))
 	end
 	error("syntax error: "..str)
 end
