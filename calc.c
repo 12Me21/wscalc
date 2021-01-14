@@ -94,7 +94,7 @@ Num readAfter(Str* pstr, int depth, Num acc) {
 Num readExpr(Str* pstr, int depth) {
 	Str str = *pstr;
 	Num acc = readValue(&str, depth);
-	return readAfter(&str, depth, acc);
+	RET(readAfter(&str, depth, acc));
 }
 
 void main(int argc, Str* argv) {
