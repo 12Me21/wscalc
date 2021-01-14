@@ -1,6 +1,7 @@
 #include <string.h>
 #include <stdlib.h>
 #include <stdio.h>
+#include <math.h>
 
 typedef double Num;
 typedef char* Str;
@@ -8,20 +9,29 @@ typedef Num (*Op)(/*any args lol*/); //typedef Op
 typedef struct {Str name; Op func;} OpDef;
 
 #define RET(n) { __auto_type temp = (n) ; *pstr = str; return(temp); }
+#define OPDEF(name, expr) Num op_##name(Num a, Num b) { return (expr); }
 
-Num negate(Num a) {
-	return -a;
-}
-Num subtract(Num a, Num b) {
-	return a-b;
-}
+OPDEF(add, a+b);
+OPDEF(sub, a-b);
+OPDEF(mul, a*b);
+OPDEF(div, a/b);
+OPDEF(mod, fmod(a,b));
+OPDEF(pow, pow(a,b));
+
+OPDEF(neg, -a);
+
 OpDef prefix[] = {
-	{"-", negate},
+	{"-", op_neg},
 	{NULL, NULL},
 };
 
 OpDef infix[] = {
-	{"-", subtract},
+	{"+", op_add},
+	{"-", op_sub},
+	{"*", op_mul},
+	{"/", op_div},
+	{"%", op_mod},
+	{"^", op_pow},
 	{NULL, NULL},
 };
 
@@ -47,11 +57,9 @@ Op search(Str* pstr, OpDef* ops) {
 }
 Num readValue(Str* pstr, int depth) {
 	Str str = *pstr;
-	printf("readvalue: %s\n", str);
 	if (str[0]>='0' && str[0]<='9' || str[0]=='.') {
 		Str end;
 		Num num = strtod(str, &end);
-		printf("strtod: %f\n", num);
 		if (end) {
 			str = end;
 			RET(num);
@@ -63,17 +71,14 @@ Num readValue(Str* pstr, int depth) {
 	}
 	Op op = search(&str, prefix);
 	if (op) {
-		printf("afterop: %s\n", str);
-		RET(op(readValue(&str, depth)));
+		RET(op(readValue(&str, depth), 0));
 	}
-	puts("ERROR");
 }
 
 Num readAfter(Str* pstr, int depth, Num acc) {
 	Str str = *pstr;
-	printf("readafter: %s\n", str);
 	if (str[0]==' ') {
-		str = str+2;
+		str++;
 		if (depth>0)
 			RET(acc);
 	}
@@ -84,12 +89,10 @@ Num readAfter(Str* pstr, int depth, Num acc) {
 		Num v = readValue(&str, depth);
 		RET(readAfter(&str, depth, op(acc, v)));
 	}
-	puts("ERROR");
 }
 
 Num readExpr(Str* pstr, int depth) {
 	Str str = *pstr;
-	printf("readexpr: %s\n", str);
 	Num acc = readValue(&str, depth);
 	return readAfter(&str, depth, acc);
 }
