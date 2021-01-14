@@ -34,13 +34,6 @@ OpDef infix[] = {
 	{NULL, NULL},
 };
 
-int match(Str at, Str word) {
-	for (; word++,at++ ; *word)
-		if (*word!=*at)
-			return 0;
-	return 1;
-}
-
 Num readExpr(Str&, int);
 
 Op search(Str& str, OpDef* ops) {
