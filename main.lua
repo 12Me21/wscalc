@@ -44,7 +44,7 @@ end
 
 function readValue(str, depth)
 
-	local num = str:match("^%d+")
+	local num = str:match("^%d*.?%d+")
 	if num then
 		return tonumber(num), str:sub(#num+1)
 	end
