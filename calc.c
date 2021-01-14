@@ -2,29 +2,27 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <math.h>
+#include <setjmp.h>
+
+#define when(n) break; case n
 
 typedef double Num;
-typedef char* Str;
+typedef const char* Str;
 typedef Num (*Op)(/*any args lol*/); //typedef Op
 typedef struct {Str name; Op func;} OpDef;
 
-#define RET(n) { __auto_type temp = (n) ; *pstr = str; return(temp); }
 #define OPDEF(name, expr) Num op_##name(Num a, Num b) { return (expr); }
-
+OPDEF(neg, -a);
+OpDef prefix[] = {
+	{"-", op_neg},
+	{NULL, NULL},
+};
 OPDEF(add, a+b);
 OPDEF(sub, a-b);
 OPDEF(mul, a*b);
 OPDEF(div, a/b);
 OPDEF(mod, fmod(a,b));
 OPDEF(pow, pow(a,b));
-
-OPDEF(neg, -a);
-
-OpDef prefix[] = {
-	{"-", op_neg},
-	{NULL, NULL},
-};
-
 OpDef infix[] = {
 	{"+", op_add},
 	{"-", op_sub},
@@ -35,70 +33,73 @@ OpDef infix[] = {
 	{NULL, NULL},
 };
 
-int match(Str at, Str word) {
-	for (; word++,at++ ; *word)
-		if (*word!=*at)
-			return 0;
-	return 1;
-}
+Num readExpr(Str*, int, jmp_buf);
 
-Num readExpr(Str*, int);
-
-Op search(Str* pstr, OpDef* ops) {
-	Str str = *pstr;
+Op search(Str* str, OpDef* ops) {
 	for (; ops->name ; ops++) {
 		int len = strlen(ops->name);
-		if (strncmp(str, ops->name, len)==0) {
-			str += len;
-			RET(ops->func);
+		if (strncmp(*str, ops->name, len)==0) {
+			*str += len;
+			return ops->func;
 		}
 	}
 	return NULL;
 }
-Num readValue(Str* pstr, int depth) {
-	Str str = *pstr;
-	if (str[0]>='0' && str[0]<='9' || str[0]=='.') {
+Num readValue(Str* str, int depth, jmp_buf env) {
+	if ((*str)[0]>='0' && (*str)[0]<='9' || (*str)[0]=='.') {
 		Str end;
-		Num num = strtod(str, &end);
+		Num num = strtod(*str, &end);
 		if (end) {
-			str = end;
-			RET(num);
+			*str = end;
+			return num;
 		}
 	}
-	if (str[0]==' ') {
-		str++;
-		RET(readExpr(&str, depth+1));
+	if ((*str)[0]==' ') {
+		(*str)++;
+		return readExpr(str, depth+1, env);
 	}
-	Op op = search(&str, prefix);
-	if (op) {
-		RET(op(readValue(&str, depth), 0));
-	}
+	Op op = search(str, prefix);
+	if (op)
+		return op(readValue(str, depth, env), 0);
+	longjmp(env, 1);
 }
 
-Num readAfter(Str* pstr, int depth, Num acc) {
-	Str str = *pstr;
-	if (str[0]==' ') {
-		str++;
+Num readAfter(Str* str, int depth, Num acc, jmp_buf env) {
+	if ((*str)[0]==' ') {
+		(*str)++;
 		if (depth>0)
-			RET(acc);
+			return acc;
 	}
-	if (str[0]=='\0')
-		RET(acc);
-	Op op = search(&str, infix);
+	if ((*str)[0]=='\0')
+		return acc;
+	Op op = search(str, infix);
 	if (op) {
-		Num v = readValue(&str, depth);
-		RET(readAfter(&str, depth, op(acc, v)));
+		Num v = readValue(str, depth, env);
+		return readAfter(str, depth, op(acc, v), env);
 	}
+	longjmp(env, 2);
 }
 
-Num readExpr(Str* pstr, int depth) {
-	Str str = *pstr;
-	Num acc = readValue(&str, depth);
-	RET(readAfter(&str, depth, acc));
+Num readExpr(Str* str, int depth, jmp_buf env) {
+	Num acc = readValue(str, depth, env);
+	return readAfter(str, depth, acc, env);
 }
 
-void main(int argc, Str* argv) {
+int main(int argc, Str* argv) {
+	if (argc<1) return 1;
 	Str expr = argv[1];
-	Num res = readExpr(&expr, 0);
-	printf("%f", res);
+	Num res;
+	jmp_buf env;
+	switch (setjmp(env)) {
+	when(0):
+		res = readExpr(&expr, 0, env);
+		printf("%f", res);
+		return 0;
+	when(1):
+		puts("Expected Value");
+	when(2):
+		puts("Expected Operator");
+	}
+	printf("%.*s⟨here⟩%s\n", (int)(expr-argv[1]), argv[1], expr);
+	return 1;
 }
