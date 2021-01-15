@@ -1,4 +1,4 @@
-CFLAGS += -lm
+CFLAGS += -lm -lreadline
 name = calc
 $(name):
 
