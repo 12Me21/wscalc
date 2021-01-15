@@ -1,5 +1,5 @@
 - no operator precedence; left-to-right only (this is a Feature)
-- grouping determined by spacing: 1/ 2+2 -> 0.25
+- grouping determined by spacing. Ex: 1/ 2+2 -> 0.25
 
 Run `make`, then `./calc`
 (requires a c compiler, and the readline library)
@@ -11,6 +11,7 @@ spaces before an infix operator are treated as `)` (if there are open parenthese
 Ex:
 1+2 / 3+4 -> (1+2)/(3+4)
 -1^ 2+2 /3 -> -1^(2+2)/3
+- 5+10 -> -(5+10)
 
 Operators:
 infix: + - * / % ^
