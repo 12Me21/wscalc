@@ -25,7 +25,9 @@ OpDef infix[] = {
 	{NULL, NULL},
 };
 
+// GLOBALS
 Num ans = 0;
+jmp_buf env;
 
 Op search(Str* str, OpDef* ops) {
 	for (; ops->name ; ops++) {
@@ -38,9 +40,9 @@ Op search(Str* str, OpDef* ops) {
 	return NULL;
 }
 
-Num readExpr(Str*, int, jmp_buf);
+Num readExpr(Str*, int);
 
-Num readValue(Str* str, int depth, jmp_buf env) {
+Num readValue(Str* str, int depth) {
 	if ((*str)[0]>='0' && (*str)[0]<='9' || (*str)[0]=='.') {
 		Str end;
 		Num num = strtod(*str, &end);
@@ -53,35 +55,36 @@ Num readValue(Str* str, int depth, jmp_buf env) {
 		(*str)++;
 		return ans;
 	}
-	if ((*str)[0]==' ') {
+	if ((*str)[0]==' ') { // Start group
 		(*str)++;
-		return readExpr(str, depth+1, env);
+		return readExpr(str, depth+1);
 	}
 	Op op = search(str, prefix);
 	if (op)
-		return op(readValue(str, depth, env), 0);
+		return op(readValue(str, depth), 0);
 	longjmp(env, 1);
 }
 
-Num readAfter(Str* str, int depth, Num acc, jmp_buf env) {
-	if ((*str)[0]==' ') {
+Num readAfter(Str* str, int depth, Num acc) {
+	if ((*str)[0]==' ') { // End group
 		(*str)++;
 		if (depth>0)
 			return acc;
 	}
-	if ((*str)[0]=='\0')
+	if ((*str)[0]=='\0') // End group (end of string)
 		return acc;
+	
 	Op op = search(str, infix);
 	if (op) {
-		Num v = readValue(str, depth, env);
-		return readAfter(str, depth, op(acc, v), env);
+		Num v = readValue(str, depth);
+		return readAfter(str, depth, op(acc, v));
 	}
 	longjmp(env, 2);
 }
 
-Num readExpr(Str* str, int depth, jmp_buf env) {
-	Num acc = readValue(str, depth, env);
-	return readAfter(str, depth, acc, env);
+Num readExpr(Str* str, int depth) {
+	Num acc = readValue(str, depth);
+	return readAfter(str, depth, acc);
 }
 
 int main(int argc, Str* argv) {
@@ -92,11 +95,10 @@ int main(int argc, Str* argv) {
 			break;
 		//if (line[0]=='\0')
 		//	continue;
-		jmp_buf env;
 		switch (setjmp(env)) {
 		when(0):;
 			Str expr = line;
-			Num res = readExpr(&expr, 0, env);
+			Num res = readExpr(&expr, 0);
 			ans = res;
 			printf("> %.15g\n", res);
 		when(1):;

@@ -1,7 +1,9 @@
 CFLAGS += -lm -lreadline
 name = calc
-$(name):
 
-.PHONY: clean
+first: $(name)
+
 clean:
 	$(RM) *.o $(name)
+
+.PHONY: clean first
