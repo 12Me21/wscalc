@@ -3,7 +3,7 @@
 
 Run `make`, then `./calc`
 (requires a c compiler, and the readline library)
-Code is in `calc.c`. `calc.c++` and `calc.lua` were experiments.
+Code is in `calc.c`. `calc.c++` and `main.lua` were experiments.
 
 Parsing:
 spaces after an operator are treated as `(` (closed automatically at end of expression)
