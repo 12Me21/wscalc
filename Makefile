@@ -1,9 +1,8 @@
-CFLAGS += -lm -lreadline
-name = calc
+srcs:= calc decimal
+output:= calc
 
-first: $(name)
+libs:= m readline
 
-clean:
-	$(RM) *.o $(name)
+CFLAGS+= -Wextra -Wall -g -ftabstop=3 -Wno-unused-parameter
 
-.PHONY: clean first
+include Nice.mk
