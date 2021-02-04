@@ -17,7 +17,7 @@ typedef char* Str;
 typedef Num (*Op)(/*any args lol*/); //typedef Op(*) -> Num
 typedef struct {Str name; Op func;} OpDef;
 
-int scanDL(Num* out);
+int scanDL(Num* out, FILE* stream);
 Num strtoDL(char* s, char** end);
 void printDL(Num x);
 
@@ -57,7 +57,7 @@ OPDEFL(input, {
 		if (isatty(0))
 			err("input number: ");
 		_Decimal128 res;
-		if (scanDL(&res)==1)
+		if (scanDL(&res, stdin)==1)
 			return res;
 		longjmp(env, 4);
 	});
@@ -218,6 +218,15 @@ int doline(Str line, int interactive) {
 int main(int argc, Str* argv) {
 	if (argc == 2)
 		return doline(argv[1], 0);
+	if (!isatty(0)) {
+		Str line = NULL;
+		size_t n = 0;
+		ssize_t c = 0;
+		c = getline(&line, &n, stdin);
+		if (line[c-1]=='\n')
+			line[c-1] = '\0';
+		return doline(line, 0);
+	}
 	using_history();
 	while (1) {
 		Str line = readline("<< ");

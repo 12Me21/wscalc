@@ -44,21 +44,25 @@ Num strtoDL(char* s, char** end) {
 	return n;
 }
 
-void printDL(Num x) {
+void printDL(Num num) {
 	Num div = _Generic(div,
 		_Decimal128: 1e6144dl
 	);
-	if (x<0) {
+	if (num<0) {
 		putchar('-');
-		x = -x;
+		num = -num;
 	}
 	int zeros = 0;
 	int decimal = 0;
 	int firstd = 0;
+	///dprintf(2, "<1 %d\n", num<1);
 	for (; div; div/=10) {
-		int digit = (x/1e6144dl*1e-6143dl/1e-6143dl);
-		x -= digit * 1e6144dl;
-		x *= 10;
+		Num x = num/1e6144dl/1e6143dl*1e6143dl*1e6144dl;
+		int digit = (x/1e6144dl);
+		if (num < digit * 1e6144dl) //in case it rounds up
+			digit--;
+		num -= digit * 1e6144dl;
+		num *= 10;
 		if (digit) {
 			for (; decimal; decimal=0)
 				putchar('.');
@@ -75,7 +79,7 @@ void printDL(Num x) {
 		if (div==1) {
 			decimal = 1;
 			for (; !firstd; firstd=1)
-				putchar('.');
+				putchar('0');
 		}
 	}
 }
