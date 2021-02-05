@@ -26,6 +26,8 @@ Bool scanDL(Num* out, FILE* stream) {
 			decimal = 0.1dl;
 		} else if (c==EOF) {
 			break;
+		} else if (c=='e') {
+			
 		} else {
 			ungetc(c, stream);
 			break;
@@ -48,10 +50,11 @@ Num strtoDL(char* s, char** end) {
 }
 
 #define MAX_DIGIT 1e6144dl
-#define MIN_DIGIT 1e-6143dl
+#define MIN_DIGIT 1e-6176dl
 
 // Print a _Decimal128
 void printDL(Num num) {
+	// NaN
 	if (num != num) {
 		printf("NaN");
 		return;
@@ -61,6 +64,7 @@ void printDL(Num num) {
 		putchar('-');
 		num = -num;
 	}
+	// Infinity
 	if (num >= MAX_DIGIT*10) {
 		printf("Infinity");
 		return;
@@ -69,24 +73,18 @@ void printDL(Num num) {
 	int zeros = 0;
 	Bool decimal = false;
 	Bool leading = true;
-	Num div;
-	for (div=MAX_DIGIT; div>0; div/=10) {
-		//This gets the digit in the highest possible place.
-		int digit = num /MAX_DIGIT*MIN_DIGIT /MIN_DIGIT;
-		// we take the number, and divide it
-		// (in 2 steps because the divisor is too large)
-		// so that the highest possible digit into the lowest possible digit's place,
-		// (and all other digits are lost)
-		// then multiply so that this digit is in the 1's place.
-
-		// because it rounds instead of flooring, we have to subtract 1 if it rounded up
-		if (num < digit * 1e6144dl)
-			digit--;
-		// now, we multiply this digit back into the uppermost place
-		// subtract it from the number, and multiply the number by 10
-		// to shift the next digit into place
-		num -= digit * 1e6144dl;
-		num *= 10;
+	Num place;
+	for (place=MAX_DIGIT; place>0; place/=10) {
+		/*if (place > num)
+			continue;
+		if (!num)
+		break;*/
+		int digit;
+		for (digit=0; digit<=9; digit++) {
+			if (num < place)
+				break;
+			num -= place;
+		}
 		// nonzero digits
 		if (digit) {
 			// if we're past the decimal point:
@@ -100,16 +98,16 @@ void printDL(Num num) {
 			putchar(digit+'0');
 		} else if (!leading) { // zero digit (except leading zeros)
 			// if we're before the decimal point, always print non-leading zeros
-			if (div>=1)
+			if (place>=1)
 				putchar('0');
 			// otherwise, keep track of how many zeros there are
-			// so they can be printed if they are not trailing zeros
+			// so they can be printed if a nonzero digit shows up later
 			else
 				zeros++;
 		}
 		// if we're at the 1's place, set a flag that will
 		// print a decimal point IF there are any nonzero digits after it
-		if (div==1) {
+		if (place==1) {
 			decimal = true;
 			// if no digits have been printed yet, display a 0 before the decimal
 			if (leading)
@@ -117,4 +115,13 @@ void printDL(Num num) {
 			leading = false;
 		}
 	}
+}
+
+Num DLfloor(Num a) {
+	Num b = a*MIN_DIGIT/MIN_DIGIT;
+	return b<=a ? b : b-1;
+}
+
+Num DLmod(Num a, Num b) {
+	return a-DLfloor(a/b)*b;
 }
