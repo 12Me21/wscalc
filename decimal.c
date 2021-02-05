@@ -2,8 +2,40 @@
 #include <string.h>
 #include <stdbool.h>
 #include <math.h>
+#include <stdint.h>
 
 #include "decimal.h"
+
+/*int DLexponent(Num num) {
+	__int128 bits = (union {Num num; __int128 i;}){.num=num}.i;
+	uint32_t top = bits>>(128-32);
+	int i;
+	for(i=127; i>=0; i--) {
+		putchar('0'+(bits>>i&1));
+	}
+	puts("");
+	Bool sign = top>>31;
+	int exp = top>>(32-17+1) & (1<<12)-1;
+	int comb = top>>(32-5-1) & 0b11111;
+	int sig;
+	printf("%d\n", comb);
+	switch (comb) {
+	case 0b00000 ... 0b10111:
+		exp |= comb>>3<<12;
+		sig = comb & 0b111;
+		break;
+	case 0b11000 ... 0b11101:
+		exp |= (comb>>1 & 0b11)<<12;
+		sig = comb & 0b1;
+		break;
+	case 0b11110:; //infinity
+		
+	break;
+	case 0b11111:; //nan
+		
+	}
+	return exp - 6176;
+	}*/
 
 Num DLread(Str* str, int base) {
 	Str start = *str;
@@ -90,7 +122,7 @@ Num strtoDL(char* s, char** end) {
 #define MIN_DIGIT 1e-6176dl
 
 // Print a _Decimal128
-void printDL(Num num) {
+void DLprint(Num num, int base) {
 	// NaN
 	if (num != num) {
 		printf("NaN");
@@ -102,7 +134,7 @@ void printDL(Num num) {
 		num = -num;
 	}
 	// Infinity
-	if (num >= MAX_DIGIT*10) {
+	if (num >= DLinf) {
 		printf("Infinity");
 		return;
 	}
@@ -110,14 +142,29 @@ void printDL(Num num) {
 	int zeros = 0;
 	Bool decimal = false;
 	Bool leading = true;
-	Num place;
-	for (place=MAX_DIGIT; place>0; place/=10) {
+	Num place = 1;
+	if (base == 10) {
+		place = MAX_DIGIT;
+	} else {
+		Num prev = place;
+		while (place < 1e32dl) {
+			prev = place;
+			place *= base;
+		}
+		place = prev;
+		if (num >= place*10) {
+			printf("<too large, printing in decimal> ");
+			base = 10;
+			place = MAX_DIGIT;
+		}
+	}
+	for (; place>0; place/=base) {
 		/*if (place > num)
 			continue;
 		if (!num)
 		break;*/
 		int digit;
-		for (digit=0; digit<=9; digit++) {
+		for (digit=0; digit<base; digit++) {
 			if (num < place)
 				break;
 			num -= place;
@@ -132,7 +179,10 @@ void printDL(Num num) {
 			for (; zeros; zeros--)
 				putchar('0');
 			leading = false;
-			putchar(digit+'0');
+			if (digit < 10)
+				putchar(digit+'0');
+			else
+				putchar(digit-10+'A');
 		} else if (!leading) { // zero digit (except leading zeros)
 			// if we're before the decimal point, always print non-leading zeros
 			if (place>=1)
