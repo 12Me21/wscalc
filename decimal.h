@@ -1,0 +1,14 @@
+typedef _Decimal128 Num;
+typedef _Bool Bool;
+typedef char Char;
+typedef Char* Str;
+
+#define DLnan ((Num)NAN)
+#define DLinf ((Num)INFINITY)
+
+Bool scanDL(Num* out, FILE* stream);
+Num strtoDL(char* s, char** end);
+void printDL(Num x);
+Num DLread(Str* str, int base);
+Num DLfloor(Num a);
+Num DLmod(Num a, Num b);
