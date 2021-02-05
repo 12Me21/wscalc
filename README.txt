@@ -1,5 +1,6 @@
 - no operator precedence; left-to-right only (this is a Feature)
 - grouping determined by spacing. Ex: 1/ 2+2 -> 0.25
+- uses 128 bit DECIMAL floating point (34 digits)
 
 Run `make`, then `./calc`
 (requires a c compiler, and the readline library)
