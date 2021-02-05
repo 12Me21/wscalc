@@ -21,6 +21,9 @@ typedef struct {Str name; Op func;} OpDef;
 int scanDL(Num* out, FILE* stream);
 Num strtoDL(char* s, char** end);
 void printDL(Num x);
+Num DLround(Num a);
+Num DLfloor(Num a);
+Num DLmod(Num a, Num b);
 
 // GLOBALS
 Num ans = 0;
@@ -29,6 +32,7 @@ jmp_buf env;
 
 #define OPDEF(name, expr) Num op_##name(Num a, Num b) { return (expr); }
 #define OPDEFL(name, code) Num op_##name(Num a, Num b) { code }
+#define OPDEFS(name, code) Num op_##name(Str* str) { code }
 
 // Prefix Operator Definitions
 OPDEF(neg,-a);
@@ -40,13 +44,13 @@ OpDef prefix[] = {
 };
 // Infix Operator Definitions
 OPDEF(add,a+b);OPDEF(sub,a-b);
-OPDEF(mul,a*b);OPDEF(div,a/b);//OPDEF(mod,fmod(a,b));
+OPDEF(mul,a*b);OPDEF(div,a/b);OPDEF(mod,DLmod(a,b));
 //OPDEF(pow,pow(a,b));
 OPDEF(shr,(IntNum)a>>(IntNum)b);OPDEF(shl,(IntNum)a<<(IntNum)b);
 OPDEF(and,(IntNum)a&(IntNum)b);OPDEF(or,(IntNum)a|(IntNum)b);OPDEF(xor,(IntNum)a^(IntNum)b);
 OpDef infix[] = {
 	{"+",op_add},{"-",op_sub},
-	{"*",op_mul},{"/",op_div},//{"%",op_mod},
+	{"*",op_mul},{"/",op_div},{"%",op_mod},
 	//{"^",op_pow},
 	{">>",op_shr},{"<<",op_shl},
 	{"&",op_and},{"|",op_or},{"~",op_xor},
@@ -74,6 +78,48 @@ OpDef variable[] = {
 	{NULL, NULL},
 };
 
+// literal prefixes
+OPDEFS(hex,
+	Num num = 0;
+	for (;;) {
+		char c = **str;
+		if (c>='0' && c<='9') {
+			num *= 16;
+			num += c-'0';
+			(*str)++;
+		} else if (c>='a' && c<='f') {
+			num *= 16;
+			num += c-'a';
+			(*str)++;
+		} else if (c>='A' && c<='F') {
+			num *= 16;
+			num += c-'A';
+			(*str)++;
+		} else
+			break;
+	}
+	return num;
+);
+OPDEFS(bin,
+	Num num = 0;
+	for (;;) {
+		char c = **str;
+		if (c=='0' || c=='1') {
+			num *= 2;
+			num += c-'0';
+			(*str)++;
+		} else
+			break;
+	}
+	return num;
+);
+OpDef literal[] = {
+	{"0x",op_hex},{"0b",op_bin},
+	{"&h",op_hex},{"&H",op_hex},
+	{"&b",op_bin},{"&B",op_bin},
+	{NULL, NULL},
+};
+
 Op search(Str* str, OpDef* ops) {
 	for (; ops->name ; ops++) {
 		int len = strlen(ops->name);
@@ -87,28 +133,10 @@ Op search(Str* str, OpDef* ops) {
 
 Num readExpr(Str*, int);
 
-// Read hex number. similar to `strtod`
-Num strtoh(Str str, Str* end) {
-	int len;
-	unsigned int num;
-	if (sscanf(str, "%x%n", &num, &len)==1) {
-		*end = str+len;
-		return num;
-	}
-	*end = NULL;
-	return 0;
-}
-
 Num readValue(Str* str, int depth) {
-	// hex number
-	if ((*str)[0]=='0' && (*str)[1]=='x') {
-		Str end;
-		Num num = strtoh(*str, &end);
-		if (end) {
-			*str = end;
-			return num;
-		}
-	}
+	Op op = search(str, literal);
+	if (op)
+		return op(str);
 	// decimal
 	if (((*str)[0]>='0' && (*str)[0]<='9') || (*str)[0]=='.') {
 		Str end;
@@ -124,7 +152,7 @@ Num readValue(Str* str, int depth) {
 		return readExpr(str, (depth || 1)+1);
 	}
 	// Variable
-	Op op = search(str, variable);
+	op = search(str, variable);
 	if (op)
 		return op(0, 0);
 	// Prefix Operator
