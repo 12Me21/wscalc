@@ -1,9 +1,44 @@
 #include <stdio.h>
 #include <string.h>
 #include <stdbool.h>
+#include <math.h>
 
-typedef _Decimal128 Num;
-typedef _Bool Bool;
+#include "decimal.h"
+
+Num DLread(Str* str, int base) {
+	Str start = *str;
+	Num num = 0;
+	Num place = -1;
+	while (1) {
+		Char c = **str;
+		if (!c)
+			break;
+		if (c=='.' && place<0) {
+			place = 1.dl/base;
+		} else {
+			if (c>='0' && c<='9')
+				c -= '0';
+			else if (c>='A' && c<='Z')
+				c -= 'A'-10;
+			else if (c>='a' && c<='z')
+				c -= 'a'-10;
+			else
+				break;
+			if (c >= base)
+				break;
+			if (place > 0) {
+				num += c*place;
+				place /= base;
+			} else
+				num = num*base + c;
+		}
+		(*str)++;
+	}
+	Num definitely_no_zero_here = 0;
+	if (*str == start)
+		return 1.0dl/definitely_no_zero_here*0;
+	return num;
+}
 
 Bool scanDL(Num* out, FILE* stream) {
 	Num ret = 0;
@@ -27,6 +62,8 @@ Bool scanDL(Num* out, FILE* stream) {
 		} else if (c==EOF) {
 			break;
 		} else if (c=='e') {
+			c = fgetc(stream);
+				
 			
 		} else {
 			ungetc(c, stream);

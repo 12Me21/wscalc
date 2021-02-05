@@ -8,31 +8,26 @@
 #include <readline/history.h>
 #include <errno.h>
 
+#include "decimal.h"
+
 #define when(n) break; case n
 #define otherwise break; default
 #define err(args...) fprintf(stderr, args)
 
-typedef _Decimal128 Num;
 typedef long long IntNum;
 typedef char* Str;
 typedef Num (*Op)(/*any args lol*/); //typedef Op(*) -> Num
 typedef struct {Str name; Op func;} OpDef;
-
-int scanDL(Num* out, FILE* stream);
-Num strtoDL(char* s, char** end);
-void printDL(Num x);
-Num DLround(Num a);
-Num DLfloor(Num a);
-Num DLmod(Num a, Num b);
 
 // GLOBALS
 Num ans = 0;
 int haveAns = 0;
 jmp_buf env;
 
-#define OPDEF(name, expr) Num op_##name(Num a, Num b) { return (expr); }
-#define OPDEFL(name, code) Num op_##name(Num a, Num b) { code }
-#define OPDEFS(name, code) Num op_##name(Str* str) { code }
+#define OPDEF(name, expr...) Num op_##name(Num a, Num b) { return (expr); }
+#define OPDEFL(name, code...) Num op_##name(Num a, Num b) { code }
+#define OPDEFS(name, expr...) Num op_##name(Str* str) { return expr; }
+#define OPDEFSL(name, code...) Num op_##name(Str* str) { code }
 
 // Prefix Operator Definitions
 OPDEF(neg,-a);
@@ -57,66 +52,32 @@ OpDef infix[] = {
 	//	{"->",op_assign},
 	{NULL, NULL},
 };
-// Variable Definitions
-OPDEFL(input, {
-		if (isatty(0))
-			err("input number: ");
-		_Decimal128 res;
-		if (scanDL(&res, stdin)==1)
-			return res;
-		longjmp(env, 4);
-	});
-OPDEFL(ans, {
-		if (haveAns)
-			return ans;
-		return op_input(a, b);
-	});
-// variables
-OpDef variable[] = {
-	{"a",op_ans},
-	{"i",op_input},
-	{NULL, NULL},
-};
 
-// literal prefixes
-OPDEFS(hex,
-	Num num = 0;
-	for (;;) {
-		char c = **str;
-		if (c>='0' && c<='9') {
-			num *= 16;
-			num += c-'0';
-			(*str)++;
-		} else if (c>='a' && c<='f') {
-			num *= 16;
-			num += c-'a';
-			(*str)++;
-		} else if (c>='A' && c<='F') {
-			num *= 16;
-			num += c-'A';
-			(*str)++;
-		} else
-			break;
-	}
-	return num;
+// variables + literal prefixes
+OPDEFS(bin, DLread(str, 2));
+OPDEFS(oct, DLread(str, 8));
+OPDEFS(hex, DLread(str, 16));
+OPDEFS(nan, DLnan);
+OPDEFS(inf, DLinf);
+OPDEFSL(input,
+	if (isatty(0))
+		err("input number: ");
+	_Decimal128 res;
+	if (scanDL(&res, stdin)==1)
+		return res;
+	longjmp(env, 4);
 );
-OPDEFS(bin,
-	Num num = 0;
-	for (;;) {
-		char c = **str;
-		if (c=='0' || c=='1') {
-			num *= 2;
-			num += c-'0';
-			(*str)++;
-		} else
-			break;
-	}
-	return num;
-);
+OPDEFS(ans,	haveAns ? ans : op_input(str));
+
+// todo: sort by length
 OpDef literal[] = {
-	{"0x",op_hex},{"0b",op_bin},
-	{"&h",op_hex},{"&H",op_hex},
-	{"&b",op_bin},{"&B",op_bin},
+	{"0x",op_hex},{"&h",op_hex},{"&H",op_hex},
+	{"0b",op_bin},{"&b",op_bin},{"&B",op_bin},
+	{"0o",op_oct},{"&o",op_oct},{"&O",op_oct},
+	{"NaN",op_nan},{"nan",op_nan},
+	{"inf",op_inf},{"infinity",op_inf},{"Inf",op_inf},{"Infinity",op_inf},
+	{"a",op_ans},
+	{"i",op_ans},
 	{NULL, NULL},
 };
 
@@ -134,6 +95,12 @@ Op search(Str* str, OpDef* ops) {
 Num readExpr(Str*, int);
 
 Num readValue(Str* str, int depth) {
+	// Start group
+	if ((*str)[0]==' ') { 
+		(*str)++;
+		return readExpr(str, (depth || 1)+1);
+	}
+	// literal/vars
 	Op op = search(str, literal);
 	if (op)
 		return op(str);
@@ -146,15 +113,6 @@ Num readValue(Str* str, int depth) {
 			return num;
 		}
 	}
-	// Start group
-	if ((*str)[0]==' ') { 
-		(*str)++;
-		return readExpr(str, (depth || 1)+1);
-	}
-	// Variable
-	op = search(str, variable);
-	if (op)
-		return op(0, 0);
 	// Prefix Operator
 	op = search(str, prefix);
 	if (op)
@@ -164,7 +122,7 @@ Num readValue(Str* str, int depth) {
 	// this only works if the expression is not otherwise valid.
 	// so, "-1" is not treated as "a-1", etc.
 	if (!depth)
-		return op_ans(0, 0);
+		return op_ans(str);
 	// Error
 	longjmp(env, 1);
 }
@@ -216,8 +174,12 @@ int doline(Str line, int interactive) {
 		//if (interactive) {
 			switch (result) {
 			when(1):				
-				err("! Error: expected value (number, a) or prefix operator (");
+				err("! Error: expected value (number");
 				OpDef* op;
+				for (op=literal; op->name; op++) {
+					err(", %s", op->name);
+				}
+				err(") or prefix operator (");
 				for (op=prefix; op->name; op++) {
 					if (op!=prefix)
 						err(", ");
