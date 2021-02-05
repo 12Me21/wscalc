@@ -6,6 +6,7 @@
 #include <unistd.h>
 #include <readline/readline.h>
 #include <readline/history.h>
+#include <errno.h>
 
 #define when(n) break; case n
 #define otherwise break; default
@@ -222,10 +223,19 @@ int main(int argc, Str* argv) {
 		Str line = NULL;
 		size_t n = 0;
 		ssize_t c = 0;
-		c = getline(&line, &n, stdin);
-		if (line[c-1]=='\n')
-			line[c-1] = '\0';
-		return doline(line, 0);
+		int err = 0;
+		while (1) {
+			c = getline(&line, &n, stdin);
+			if (c<0) {
+				err = err || errno;
+				break;
+			}
+			if (line[c-1]=='\n')
+				line[c-1] = '\0';
+			err = err || doline(line, 0);
+		}
+		free(line);
+		return err;
 	}
 	using_history();
 	while (1) {

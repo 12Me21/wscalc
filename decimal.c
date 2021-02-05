@@ -1,16 +1,18 @@
 #include <stdio.h>
 #include <string.h>
+#include <stdbool.h>
 
 typedef _Decimal128 Num;
+typedef _Bool Bool;
 
-int scanDL(Num* out, FILE* stream) {
+Bool scanDL(Num* out, FILE* stream) {
 	Num ret = 0;
 	Num decimal = 0;
-	int got=0;
+	Bool got = false;
 	while(1) {
 		int c = fgetc(stream);
 		if (c>='0' && c<='9') {
-			got=1;
+			got = true;
 			c-='0';
 			if (decimal) {
 				ret += c*decimal;
@@ -20,8 +22,8 @@ int scanDL(Num* out, FILE* stream) {
 				ret += c;
 			}
 		} else if (c=='.' && !decimal) {
-			got=1;
-			decimal = 0.1DL;
+			got = true;
+			decimal = 0.1dl;
 		} else if (c==EOF) {
 			break;
 		} else {
@@ -33,10 +35,11 @@ int scanDL(Num* out, FILE* stream) {
 	return got;
 }
 
+// this is a hack because i wrote the stream version first...
 Num strtoDL(char* s, char** end) {
 	FILE* f=fmemopen(s, strlen(s), "r");
 	Num n;
-	int r = scanDL(&n, f);
+	Bool r = scanDL(&n, f);
 	if (r)
 		*end = s+ftell(f);
 	else
@@ -44,42 +47,74 @@ Num strtoDL(char* s, char** end) {
 	return n;
 }
 
+#define MAX_DIGIT 1e6144dl
+#define MIN_DIGIT 1e-6143dl
+
+// Print a _Decimal128
 void printDL(Num num) {
-	Num div = _Generic(div,
-		_Decimal128: 1e6144dl
-	);
-	if (num<0) {
+	if (num != num) {
+		printf("NaN");
+		return;
+	}
+	// test for negatives, including -0
+	if (num<0 || (num==0 && 1/num<0)) {
 		putchar('-');
 		num = -num;
 	}
+	if (num >= MAX_DIGIT*10) {
+		printf("Infinity");
+		return;
+	}
+	
 	int zeros = 0;
-	int decimal = 0;
-	int firstd = 0;
-	///dprintf(2, "<1 %d\n", num<1);
-	for (; div; div/=10) {
-		Num x = num/1e6144dl/1e6143dl*1e6143dl*1e6144dl;
-		int digit = (x/1e6144dl);
-		if (num < digit * 1e6144dl) //in case it rounds up
+	Bool decimal = false;
+	Bool leading = true;
+	Num div;
+	for (div=MAX_DIGIT; div>0; div/=10) {
+		//This gets the digit in the highest possible place.
+		int digit = num /MAX_DIGIT*MIN_DIGIT /MIN_DIGIT;
+		// we take the number, and divide it
+		// (in 2 steps because the divisor is too large)
+		// so that the highest possible digit into the lowest possible digit's place,
+		// (and all other digits are lost)
+		// then multiply so that this digit is in the 1's place.
+
+		// because it rounds instead of flooring, we have to subtract 1 if it rounded up
+		if (num < digit * 1e6144dl)
 			digit--;
+		// now, we multiply this digit back into the uppermost place
+		// subtract it from the number, and multiply the number by 10
+		// to shift the next digit into place
 		num -= digit * 1e6144dl;
 		num *= 10;
+		// nonzero digits
 		if (digit) {
-			for (; decimal; decimal=0)
+			// if we're past the decimal point:
+			if (decimal)
 				putchar('.');
+			decimal = false;
+			// if there were zeros right before this digit, print them:
 			for (; zeros; zeros--)
 				putchar('0');
-			firstd = 1;
+			leading = false;
 			putchar(digit+'0');
-		} else if (firstd) {
+		} else if (!leading) { // zero digit (except leading zeros)
+			// if we're before the decimal point, always print non-leading zeros
 			if (div>=1)
 				putchar('0');
+			// otherwise, keep track of how many zeros there are
+			// so they can be printed if they are not trailing zeros
 			else
 				zeros++;
 		}
+		// if we're at the 1's place, set a flag that will
+		// print a decimal point IF there are any nonzero digits after it
 		if (div==1) {
-			decimal = 1;
-			for (; !firstd; firstd=1)
+			decimal = true;
+			// if no digits have been printed yet, display a 0 before the decimal
+			if (leading)
 				putchar('0');
+			leading = false;
 		}
 	}
 }
