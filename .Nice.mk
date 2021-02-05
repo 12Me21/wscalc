@@ -1,16 +1,26 @@
 junkdir?= .junk
+makefile?= Makefile
 # location for intermediate files (.o and .mk)
 # (will be created automatically, as well as any subdirectories)
 # (ex: src `subdir/file` will create `.junk/subdir/` and compile `subdir/file.c` to `.junk/subdir/file.o`)
 # (remember to update .gitignore if changed)
 
+# make it so everything is rebuilt
+# if the makefiles change
+.EXTRA_PREREQS+= $(MAKEFILE_LIST)
+# but we don't want this to contain the temporary makefiles we include
+# so we will evaluate the variable's value immediately:
+.EXTRA_PREREQS:= $(.EXTRA_PREREQS)
+
 # print status nicely (assumes ansi-compatible terminal)
 empty:=
 comma:= ,
 printlist = [$1m$(subst $(empty) $(empty),[m$(comma) [$1m,$(2:$(junkdir)/%=[37m$(junkdir)/[$1m%))
-cc=@echo '$(call printlist,33,$@)	[37mfrom: $(call printlist,32,$^)[m' ; gcc
+cc=@printf %s\\n '$(call printlist,33,$@)	[37mfrom: $(call printlist,32,$^)[m	' ; gcc
+# \time -f %E
 
 # Link
+#$(output): .EXTRA_PREREQS+= $(makefile) .Nice.mk
 $(output): $(srcs:%=$(junkdir)/%.o)
 	$(cc) $(CFLAGS) $(addprefix -l,$(libs)) $^ -o $@
 

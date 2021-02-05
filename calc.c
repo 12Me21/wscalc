@@ -7,8 +7,11 @@
 #include <readline/readline.h>
 #include <readline/history.h>
 #include <errno.h>
+#include <dlfcn.h>
+#include <stdint.h>
 
 #include "decimal.h"
+#include "m68kd.h"
 
 #define when(n) break; case n
 #define otherwise break; default
@@ -18,6 +21,19 @@ typedef long long IntNum;
 typedef char* Str;
 typedef Num (*Op)(/*any args lol*/); //typedef Op(*) -> Num
 typedef struct {Str name; Op func;} OpDef;
+
+/*char* (*readline)(const char*);
+void (*using_history)(void);
+void (*add_history)(const char*);
+
+void loadReadline(void) {
+	void* handle = dlopen("/usr/lib/x86_64-linux-gnu/libreadline.so", RTLD_LAZY);
+	if (!handle)
+		exit(9);
+	readline = dlsym(handle, "readline");
+	using_history = dlsym(handle, "using_history");
+	add_history = dlsym(handle, "add_history");
+	}*/
 
 // GLOBALS
 Num ans = 0;
@@ -29,12 +45,45 @@ jmp_buf env;
 #define OPDEFS(name, expr...) Num op_##name(Str* str) { return expr; }
 #define OPDEFSL(name, code...) Num op_##name(Str* str) { code }
 
+typedef uint64_t U64;
+typedef uint32_t U32;
+typedef uint16_t U16;
+
+Num dis68k(Num a, Num ignore) {
+	U64 data = a;
+	U64 highestN(U64 data, int bits) {
+		return data>>(64-bits);
+	}
+	while (data && !highestN(data, 16))
+		data<<=16;
+	printf("data: [%016lX]\n", data);
+	U16 nextWord() {
+		U16 ret = highestN(data, 16);
+		data<<=16;
+		printf("word: %04X\n", ret);
+		return ret;
+	}
+	U32 nextLong() {
+		U32 ret = highestN(data, 32);
+		data<<=32;
+		printf("long: %08X\n", ret);
+		return ret;
+	}
+	do {
+		Str x = M68KDisasm(nextWord, nextLong);
+		printf("%s\n", x);
+	} while (data);
+	return a;
+}
+
 // Prefix Operator Definitions
 OPDEF(neg,-a);
 OPDEF(not,~(IntNum)a);
+OPDEF(bytes,dis68k(a,b));
 OpDef prefix[] = {
 	{"-",op_neg},
 	{"~",op_not},
+	{"=",op_bytes},
 	{NULL, NULL},
 };
 // Infix Operator Definitions
@@ -62,7 +111,7 @@ OPDEFS(inf, DLinf);
 OPDEFSL(input,
 	if (isatty(0))
 		err("input number: ");
-	_Decimal128 res;
+	Num res;
 	if (scanDL(&res, stdin)==1)
 		return res;
 	longjmp(env, 4);
@@ -167,7 +216,7 @@ int doline(Str line, int interactive) {
 		haveAns = 1;
 		if (interactive)
 			printf("> ");
-		printDL(res);
+		DLprint(res, 10);
 		putchar('\n');
 		return 0;
 	} else { //returned via longjump
@@ -227,6 +276,7 @@ int main(int argc, Str* argv) {
 		free(line);
 		return err;
 	}
+	//	loadReadline();
 	using_history();
 	while (1) {
 		Str line = readline("<< ");

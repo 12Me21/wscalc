@@ -1,4 +1,4 @@
-srcs:= calc decimal
+srcs:= calc decimal m68kd
 output:= calc
 
 libs:= m readline
