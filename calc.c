@@ -56,17 +56,17 @@ Num dis68k(Num a, Num ignore) {
 	}
 	while (data && !highestN(data, 16))
 		data<<=16;
-	printf("data: [%016lX]\n", data);
+	//printf("data: [%016lX]\n", data);
 	U16 nextWord() {
 		U16 ret = highestN(data, 16);
 		data<<=16;
-		printf("word: %04X\n", ret);
+		//printf("word: %04X\n", ret);
 		return ret;
 	}
 	U32 nextLong() {
 		U32 ret = highestN(data, 32);
 		data<<=32;
-		printf("long: %08X\n", ret);
+		//printf("long: %08X\n", ret);
 		return ret;
 	}
 	do {
@@ -102,10 +102,17 @@ OpDef infix[] = {
 	{NULL, NULL},
 };
 
+Num op_readchar(Str* str) {
+	if (**str)
+		return (Num)(char)*((*str)++);
+	else
+		return DLnan;
+}
 // variables + literal prefixes
 OPDEFS(bin, DLread(str, 2));
 OPDEFS(oct, DLread(str, 8));
 OPDEFS(hex, DLread(str, 16));
+OPDEFS(chr, op_readchar(str));
 OPDEFS(nan, DLnan);
 OPDEFS(inf, DLinf);
 OPDEFSL(input,
@@ -120,9 +127,10 @@ OPDEFS(ans,	haveAns ? ans : op_input(str));
 
 // todo: sort by length
 OpDef literal[] = {
-	{"0x",op_hex},{"&h",op_hex},{"&H",op_hex},
-	{"0b",op_bin},{"&b",op_bin},{"&B",op_bin},
-	{"0o",op_oct},{"&o",op_oct},{"&O",op_oct},
+	{"0x",op_hex},{"&h",op_hex},{"&H",op_hex},{"x",op_hex},
+	{"0b",op_bin},{"&b",op_bin},{"&B",op_bin},{"b",op_bin},
+	{"0o",op_oct},{"&o",op_oct},{"&O",op_oct},{"o",op_oct},
+	{"'",op_chr},{"c",op_chr},
 	{"NaN",op_nan},{"nan",op_nan},
 	{"inf",op_inf},{"infinity",op_inf},{"Inf",op_inf},{"Infinity",op_inf},
 	{"a",op_ans},
