@@ -2,8 +2,9 @@
 //#include "mem_m68k.h"
 //#include "mem_s68k.h"
 
+#define LEN(a) (sizeof(a)/sizeof((a)[0]))
 
-static char Dbg_Str[32];
+static char Dbg_Str[64];
 static char Dbg_EA_Str[16];
 static char Dbg_Size_Str[3];
 static char Dbg_Cond_Str[3];
@@ -244,7 +245,7 @@ M68KDisasm (unsigned short (*NW) (), unsigned int (*NL) ())
   unsigned short OPC;
   char Tmp_Str[32];
 
-  Dbg_Str[31] = 0;
+  Dbg_Str[LEN(Dbg_Str)-1] = 0;
   Tmp_Str[31] = 0;
 
   Next_Word = NW;
