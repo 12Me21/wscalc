@@ -8,23 +8,23 @@
 #include <readline/history.h>
 #include <errno.h>
 #include <dlfcn.h>
-#include <stdint.h>
 
-#include "decimal.h"
-#include "m68kd.h"
+#include "calc.h"
 
 #define when(n) break; case n
 #define otherwise break; default
 #define err(args...) fprintf(stderr, args)
 
-#define local static
-typedef uint64_t U64;
-typedef uint32_t U32;
-typedef uint16_t U16;
-typedef long long IntNum;
-typedef char* Str;
-typedef Num (*Op)(/*any args lol*/); //typedef Op(*) -> Num
-typedef struct {Str name; Op func;} OpDef;
+#define CRITICAL ?:(perror(NULL), exit(1), NULL)
+
+#define ALLOC(name) name = malloc(sizeof(*name)) CRITICAL
+#define ALLOCN(name, size) name = calloc(size, sizeof(*name)) CRITICAL
+#define ALLOCI(name, init...) ALLOC(name); *name = (typeof(*name)){init}
+#define ALLOCE(type) (malloc(sizeof(type)) CRITICAL)
+#define ALLOCEN(type, size) (calloc(size, sizeof(type)) CRITICAL)
+#define ALLOCEI(type, init...) ({type* ALLOCI(temp, init); temp;})
+
+#define ALLOCNI(name, size, init...) name = malloc(size*sizeof(*name)) CRITICAL; memcpy(name, ((typeof(*name))[size]){init}, size*sizeof(*name))
 
 // GLOBALS
 Num ans = 0;
@@ -41,101 +41,93 @@ void throw(int err) {
 
 #define throw(err) throw(err); longjmp(env, err);
 
-#define OPDEF(name, expr...) local Num op_##name(Num a, Num b) { return (expr); }
-#define OPDEFL(name, code...) local Num op_##name(Num a, Num b) { code }
-#define OPDEFS(name, expr...) local Num op_##name(Str* str) { return expr; }
-#define OPDEFSL(name, code...) local Num op_##name(Str* str) { code }
-
-local Num dis68k(Num a, Num ignore) {
-	U64 data = a;
-	U64 highestN(U64 data, int bits) {
-		return data>>(64-bits);
-	}
-	while (data && !highestN(data, 16))
-		data<<=16;
-	//printf("data: [%016lX]\n", data);
-	U16 nextWord() {
-		U16 ret = highestN(data, 16);
-		data<<=16;
-		//printf("word: %04X\n", ret);
-		return ret;
-	}
-	U32 nextLong() {
-		U32 ret = highestN(data, 32);
-		data<<=32;
-		//printf("long: %08X\n", ret);
-		return ret;
-	}
-	do {
-		Str x = M68KDisasm(nextWord, nextLong);
-		printf("%s\n", x);
-	} while (data);
-	return a;
-}
-
-// Prefix Operator Definitions
-OPDEF(neg,-a);
-OPDEF(not,~(IntNum)a);
-OPDEF(bytes,dis68k(a,b));
-local OpDef prefix[] = {
-	{"-",op_neg},
-	{"~",op_not},
-	{"=",op_bytes},
-	{NULL, NULL},
-};
-// Infix Operator Definitions
-OPDEF(add,a+b);OPDEF(sub,a-b);
-OPDEF(mul,a*b);OPDEF(div,a/b);OPDEF(mod,DLmod(a,b));
-//OPDEF(pow,pow(a,b));
-OPDEF(shr,(IntNum)a>>(IntNum)b);OPDEF(shl,(IntNum)a<<(IntNum)b);
-OPDEF(and,(IntNum)a&(IntNum)b);OPDEF(or,(IntNum)a|(IntNum)b);OPDEF(xor,(IntNum)a^(IntNum)b);
-local OpDef infix[] = {
-	{"+",op_add},{"-",op_sub},
-	{"*",op_mul},{"/",op_div},{"%",op_mod},
-	//{"^",op_pow},
-	{">>",op_shr},{"<<",op_shl},
-	{"&",op_and},{"|",op_or},{"~",op_xor},
-	//	{"->",op_assign},
-	{NULL, NULL},
-};
-
-// variables + literal prefixes
-OPDEFS(bin, DLread(str, 2));
-OPDEFS(oct, DLread(str, 8));
-OPDEFS(hex, DLread(str, 16));
-OPDEFSL(chr,
-	if (**str)
-		return (Num)*((*str)++);
-	else
-		return DLnan;
-);
-OPDEFS(nan, DLnan);
-OPDEFS(inf, DLinf);
-OPDEFSL(input,
+Num op_input(Str* str) {
 	if (isatty(0))
 		err("input number: ");
 	Num res;
 	if (scanDL(&res, stdin)==1)
 		return res;
 	throw(4);
-);
-OPDEFS(ans,	haveAns ? ans : op_input(str));
+}
 
-// todo: sort by length
-local OpDef literal[] = {
-	{"0x",op_hex},{"&h",op_hex},{"&H",op_hex},{"x",op_hex},
-	{"0b",op_bin},{"&b",op_bin},{"&B",op_bin},{"b",op_bin},
-	{"0o",op_oct},{"&o",op_oct},{"&O",op_oct},{"o",op_oct},
-	{"'",op_chr},{"c",op_chr},
-	{"NaN",op_nan},{"nan",op_nan},
-	{"inf",op_inf},{"infinity",op_inf},{"Inf",op_inf},{"Infinity",op_inf},
-	{"a",op_ans},
-	{"i",op_ans},
-	{NULL, NULL},
-};
+Num op_ans(Str* str) {
+	return haveAns ? ans : op_input(str);
+}
+
+OpDef* addOp(OpDef** list, OpDef* def) {
+	//printf("adding op %s\n", def->name);
+	OpDef* ALLOC(new);
+	*new = *def;
+	new->next = *list;
+	*list = new;
+	return new;
+}
+
+void loadLib(Str path) {
+	void* lib = dlopen(path, RTLD_LAZY);
+	if (!lib) {
+		fprintf(stderr, "%s\n", dlerror());
+		exit(EXIT_FAILURE);
+	}
+	void (*mainf)(void) = dlsym(lib, "main");
+	mainf();
+}
+
+void addAlias(OpDef** list, Str name) {
+	addOp(list, *list)->name = name;
+}
+
+OpDef* prefix = NULL;
+OpDef* infix = NULL;
+OpDef* literal = NULL;
+
+/*local void initOps(void) {
+	addOp2(prefix, "-", -a);
+	addOp2(prefix, "~", ~(IntNum)a);
+	addOp2(prefix, "=", dis68k(a));
+
+	addOp(&infix, &(OpDef){"+", op_add});
+	addOp2(infix, "-", a-b);
+	addOp2(infix, "*", a*b);
+	addOp2(infix, "/", a/b);
+	addOp2(infix, "%", DLmod(a,b));
+	addOp2(infix, ">>", (IntNum)a>>(IntNum)b);
+	addOp2(infix, "<<", (IntNum)a<<(IntNum)b);
+	addOp2(infix, "&", (IntNum)a&(IntNum)b);
+	addOp2(infix, "|", (IntNum)a|(IntNum)b);
+	addOp2(infix, "~", (IntNum)a^(IntNum)b);
+	
+	addOpS(literal, "0x", return DLread(str, 16));
+	addAlias(literal, "&h");
+	addAlias(literal, "&H");
+	addAlias(literal, "x");
+	addOpS(literal, "0b", return DLread(str, 2));
+	addAlias(literal, "&b");
+	addAlias(literal, "&B");
+	addAlias(literal, "b");
+	addOpS(literal, "0o", return DLread(str, 8));
+	addAlias(literal, "&o");
+	addAlias(literal, "&O");
+	addAlias(literal, "o");
+
+	addOpS(literal, "'",
+		if (**str)
+			return (Num)*((*str)++);
+		return DLnan;
+	);
+	addAlias(literal, "c");
+	addOpS(literal, "NaN", return DLnan);
+	addAlias(literal, "nan");
+	addOpS(literal, "inf", return DLinf);
+	addAlias(literal, "Inf");
+	addAlias(literal, "infinity");
+	addAlias(literal, "Infinity");
+	addOpS(literal, "a", return op_ans(str));
+	addOpS(literal, "i", return op_input(str));
+	}*/
 
 local Op search(Str* str, OpDef* ops) {
-	for (; ops->name ; ops++) {
+	for (; ops; ops=ops->next) {
 		int len = strlen(ops->name);
 		if (strncmp(*str, ops->name, len)==0) {
 			*str += len;
@@ -175,7 +167,7 @@ local Num readValue(Str* str, int depth) {
 	// this only works if the expression is not otherwise valid.
 	// so, "-1" is not treated as "a-1", etc.
 	if (!depth)
-		return op_ans(str);
+		return op_ans(NULL);
 	// Error
 	throw(1);
 }
@@ -229,11 +221,11 @@ local int doline(Str line, int interactive) {
 			when(1):				
 				err("! Error: expected value (number");
 				OpDef* op;
-				for (op=literal; op->name; op++) {
+				for (op=literal; op; op=op->next) {
 					err(", %s", op->name);
 				}
 				err(") or prefix operator (");
-				for (op=prefix; op->name; op++) {
+				for (op=prefix; op; op=op->next) {
 					if (op!=prefix)
 						err(", ");
 					err("%s", op->name);
@@ -241,7 +233,7 @@ local int doline(Str line, int interactive) {
 				err(")");
 			when(2):
 				err("! Error: expected operator (");
-				for (op=infix; op->name; op++) {
+				for (op=infix; op; op=op->next) {
 					if (op!=infix)
 						err(", ");
 					err("%s", op->name);
