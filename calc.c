@@ -102,7 +102,12 @@ OpDef infix[] = {
 	{NULL, NULL},
 };
 
-Num op_readchar(Str* str) { return (Num)(char)*((*str)++); }
+Num op_readchar(Str* str) {
+	if (**str)
+		return (Num)(char)*((*str)++);
+	else
+		return DLnan;
+}
 // variables + literal prefixes
 OPDEFS(bin, DLread(str, 2));
 OPDEFS(oct, DLread(str, 8));
