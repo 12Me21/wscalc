@@ -17,23 +17,13 @@
 #define otherwise break; default
 #define err(args...) fprintf(stderr, args)
 
+typedef uint64_t U64;
+typedef uint32_t U32;
+typedef uint16_t U16;
 typedef long long IntNum;
 typedef char* Str;
 typedef Num (*Op)(/*any args lol*/); //typedef Op(*) -> Num
 typedef struct {Str name; Op func;} OpDef;
-
-/*char* (*readline)(const char*);
-void (*using_history)(void);
-void (*add_history)(const char*);
-
-void loadReadline(void) {
-	void* handle = dlopen("/usr/lib/x86_64-linux-gnu/libreadline.so", RTLD_LAZY);
-	if (!handle)
-		exit(9);
-	readline = dlsym(handle, "readline");
-	using_history = dlsym(handle, "using_history");
-	add_history = dlsym(handle, "add_history");
-	}*/
 
 // GLOBALS
 Num ans = 0;
@@ -44,10 +34,6 @@ jmp_buf env;
 #define OPDEFL(name, code...) Num op_##name(Num a, Num b) { code }
 #define OPDEFS(name, expr...) Num op_##name(Str* str) { return expr; }
 #define OPDEFSL(name, code...) Num op_##name(Str* str) { code }
-
-typedef uint64_t U64;
-typedef uint32_t U32;
-typedef uint16_t U16;
 
 Num dis68k(Num a, Num ignore) {
 	U64 data = a;
@@ -102,17 +88,16 @@ OpDef infix[] = {
 	{NULL, NULL},
 };
 
-Num op_readchar(Str* str) {
-	if (**str)
-		return (Num)(char)*((*str)++);
-	else
-		return DLnan;
-}
 // variables + literal prefixes
 OPDEFS(bin, DLread(str, 2));
 OPDEFS(oct, DLread(str, 8));
 OPDEFS(hex, DLread(str, 16));
-OPDEFS(chr, op_readchar(str));
+OPDEFSL(chr,
+	if (**str)
+		return (Num)*((*str)++);
+	else
+		return DLnan;
+);
 OPDEFS(nan, DLnan);
 OPDEFS(inf, DLinf);
 OPDEFSL(input,
