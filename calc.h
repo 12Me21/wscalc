@@ -23,6 +23,7 @@ void throw(int err);
 #define DEF_OP(name, expr...) DEF_OP_L(name, return (expr);)
 #define DEF_LIT(name, expr...) local Num lit_##name(Str* str) { expr; }
 #define DEF_FMT(name, expr...) local Num fmt_##name(Num num, int interactive) { expr; return DLnan; }
+// wait why don't I make constructors in here,
 
 extern OpDef* infix;
 extern OpDef* prefix;

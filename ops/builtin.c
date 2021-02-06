@@ -41,11 +41,25 @@ local Num lit_name(Str** str) {
 	return DLnan;
 }
 
+// Define an output format:
+DEF_FMT(name,
+	if (interactive)
+		printf("bin:");
+	DLprint(num, 2);
+);
+//  is short for ↓
+local Num fmt_name(Num num, int interactive) {
+	if (interactive)
+		printf("bin:");
+	DLprint(num, 2);
+	return DLnan; //(this return value is required because all operator functions have the same return type)
+}
+
 // Adding operators:
 ADD_OP(list, symbol, function);
 //  is short for ↓
 addOp(&list, &(OpDef){symbol, function});
-// list - prefix, infix, or literal
+// list - prefix, infix, literal, or format
 // symbol - a string (ex: "++")
 // function - (ex: op_add2)
 
