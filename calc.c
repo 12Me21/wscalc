@@ -17,6 +17,7 @@
 #define otherwise break; default
 #define err(args...) fprintf(stderr, args)
 
+#define local static
 typedef uint64_t U64;
 typedef uint32_t U32;
 typedef uint16_t U16;
@@ -30,12 +31,22 @@ Num ans = 0;
 int haveAns = 0;
 jmp_buf env;
 
-#define OPDEF(name, expr...) Num op_##name(Num a, Num b) { return (expr); }
-#define OPDEFL(name, code...) Num op_##name(Num a, Num b) { code }
-#define OPDEFS(name, expr...) Num op_##name(Str* str) { return expr; }
-#define OPDEFSL(name, code...) Num op_##name(Str* str) { code }
+void throw(int err) {
+//todo: allow defining error strings somehow
+// maybe have throw take err message string,
+// or, allow allocating messages beforehand and use int handles.
+// this could make, for example, translation easier
+// as well as encouraging reuse of error messages
+}
 
-Num dis68k(Num a, Num ignore) {
+#define throw(err) throw(err); longjmp(env, err);
+
+#define OPDEF(name, expr...) local Num op_##name(Num a, Num b) { return (expr); }
+#define OPDEFL(name, code...) local Num op_##name(Num a, Num b) { code }
+#define OPDEFS(name, expr...) local Num op_##name(Str* str) { return expr; }
+#define OPDEFSL(name, code...) local Num op_##name(Str* str) { code }
+
+local Num dis68k(Num a, Num ignore) {
 	U64 data = a;
 	U64 highestN(U64 data, int bits) {
 		return data>>(64-bits);
@@ -66,7 +77,7 @@ Num dis68k(Num a, Num ignore) {
 OPDEF(neg,-a);
 OPDEF(not,~(IntNum)a);
 OPDEF(bytes,dis68k(a,b));
-OpDef prefix[] = {
+local OpDef prefix[] = {
 	{"-",op_neg},
 	{"~",op_not},
 	{"=",op_bytes},
@@ -78,7 +89,7 @@ OPDEF(mul,a*b);OPDEF(div,a/b);OPDEF(mod,DLmod(a,b));
 //OPDEF(pow,pow(a,b));
 OPDEF(shr,(IntNum)a>>(IntNum)b);OPDEF(shl,(IntNum)a<<(IntNum)b);
 OPDEF(and,(IntNum)a&(IntNum)b);OPDEF(or,(IntNum)a|(IntNum)b);OPDEF(xor,(IntNum)a^(IntNum)b);
-OpDef infix[] = {
+local OpDef infix[] = {
 	{"+",op_add},{"-",op_sub},
 	{"*",op_mul},{"/",op_div},{"%",op_mod},
 	//{"^",op_pow},
@@ -106,12 +117,12 @@ OPDEFSL(input,
 	Num res;
 	if (scanDL(&res, stdin)==1)
 		return res;
-	longjmp(env, 4);
+	throw(4);
 );
 OPDEFS(ans,	haveAns ? ans : op_input(str));
 
 // todo: sort by length
-OpDef literal[] = {
+local OpDef literal[] = {
 	{"0x",op_hex},{"&h",op_hex},{"&H",op_hex},{"x",op_hex},
 	{"0b",op_bin},{"&b",op_bin},{"&B",op_bin},{"b",op_bin},
 	{"0o",op_oct},{"&o",op_oct},{"&O",op_oct},{"o",op_oct},
@@ -123,7 +134,7 @@ OpDef literal[] = {
 	{NULL, NULL},
 };
 
-Op search(Str* str, OpDef* ops) {
+local Op search(Str* str, OpDef* ops) {
 	for (; ops->name ; ops++) {
 		int len = strlen(ops->name);
 		if (strncmp(*str, ops->name, len)==0) {
@@ -134,9 +145,9 @@ Op search(Str* str, OpDef* ops) {
 	return NULL;
 }
 
-Num readExpr(Str*, int);
+local Num readExpr(Str*, int);
 
-Num readValue(Str* str, int depth) {
+local Num readValue(Str* str, int depth) {
 	// Start group
 	if ((*str)[0]==' ') { 
 		(*str)++;
@@ -166,10 +177,10 @@ Num readValue(Str* str, int depth) {
 	if (!depth)
 		return op_ans(str);
 	// Error
-	longjmp(env, 1);
+	throw(1);
 }
 
-Num readAfter(Str* str, int depth, Num acc) {
+local Num readAfter(Str* str, int depth, Num acc) {
 	// End group
 	if ((*str)[0]==' ') { 
 		(*str)++;
@@ -185,15 +196,15 @@ Num readAfter(Str* str, int depth, Num acc) {
 		return readAfter(str, depth || 1, op(acc, v));
 	}
 	// Error
-	longjmp(env, 2);
+	throw(2);
 }
 
-Num readExpr(Str* str, int depth) {
+local Num readExpr(Str* str, int depth) {
 	Num acc = readValue(str, depth);
 	return readAfter(str, depth || 1, acc);
 }
 
-int doline(Str line, int interactive) {
+local int doline(Str line, int interactive) {
 	if (!line)
 		return 3;
 	if (interactive)
