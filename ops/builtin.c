@@ -67,14 +67,12 @@ DEF_OP(div, a/b);
 DEF_OP(mod, DLmod(a,b));
 
 AUTORUN {
-	ADD_OP(infix, "+", op_add);
-	ADD_OP(infix, "-", op_add);
-	ADD_OP(infix, "+", op_add);
-	ADD_OP(infix, "-", op_sub);
-	ADD_OP(infix, "*", op_mul);
-	ADD_OP(infix, "/", op_div);
-	ADD_OP(infix, "%", op_mod);
+	ADD_OP(infix, "+", op_add, "add");
+	ADD_OP(infix, "-", op_sub, "subtract");
+	ADD_OP(infix, "*", op_mul, "multiply");
+	ADD_OP(infix, "/", op_div, "divide");
+	ADD_OP(infix, "%", op_mod, "modulus");
 
-	ADD_OP(prefix, "-", op_neg);
-	ADD_OP(prefix, "~", op_not);
+	ADD_OP(prefix, "-", op_neg, "negative");
+	ADD_OP(prefix, "~", op_not, "bitwise not");
 }

@@ -29,5 +29,5 @@ DEF_OP_L(dis68k,
 );
 
 AUTORUN {
-	ADD_OP(prefix, "#", op_dis68k);
+	ADD_OP(prefix, "#", op_dis68k, "Disassemble 68000 code");
 }

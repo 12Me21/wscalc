@@ -7,7 +7,6 @@
 #include <readline/readline.h>
 #include <readline/history.h>
 #include <errno.h>
-#include <dlfcn.h>
 
 #include "calc.h"
 
@@ -15,16 +14,9 @@
 #define otherwise break; default
 #define err(args...) fprintf(stderr, args)
 
-#define CRITICAL ?:(perror(NULL), exit(1), NULL)
+#define CRITICAL ?:(err("Error"),/*perror(NULL), */exit(1), NULL)
 
 #define ALLOC(name) name = malloc(sizeof(*name)) CRITICAL
-#define ALLOCN(name, size) name = calloc(size, sizeof(*name)) CRITICAL
-#define ALLOCI(name, init...) ALLOC(name); *name = (typeof(*name)){init}
-#define ALLOCE(type) (malloc(sizeof(type)) CRITICAL)
-#define ALLOCEN(type, size) (calloc(size, sizeof(type)) CRITICAL)
-#define ALLOCEI(type, init...) ({type* ALLOCI(temp, init); temp;})
-
-#define ALLOCNI(name, size, init...) name = malloc(size*sizeof(*name)) CRITICAL; memcpy(name, ((typeof(*name))[size]){init}, size*sizeof(*name))
 
 // GLOBALS
 Num ans = 0;
@@ -39,23 +31,13 @@ void throw(int err) {
 // as well as encouraging reuse of error messages
 }
 
-#define throw(err) throw(err); longjmp(env, err);
-
-Num op_input(Str* str) {
-	if (isatty(0))
-		err("input number: ");
-	Num res;
-	if (scanDL(&res, stdin)==1)
-		return res;
-	throw(4);
-}
-
-Num op_ans(Str* str) {
-	return haveAns ? ans : op_input(str);
-}
-
 OpDef* addOp(OpDef** list, OpDef* def) {
 	//printf("adding op %s\n", def->name);
+	list CRITICAL;
+	def CRITICAL;
+	def->name CRITICAL;
+	def->func CRITICAL;
+	
 	OpDef* ALLOC(new);
 	*new = *def;
 	new->next = *list;
@@ -63,68 +45,41 @@ OpDef* addOp(OpDef** list, OpDef* def) {
 	return new;
 }
 
-void loadLib(Str path) {
-	void* lib = dlopen(path, RTLD_LAZY);
-	if (!lib) {
-		fprintf(stderr, "%s\n", dlerror());
-		exit(EXIT_FAILURE);
-	}
-	void (*mainf)(void) = dlsym(lib, "main");
-	mainf();
-}
-
 void addAlias(OpDef** list, Str name) {
+	list CRITICAL;
+	name CRITICAL;
+	
 	addOp(list, *list)->name = name;
 }
 
 OpDef* prefix = NULL;
 OpDef* infix = NULL;
 OpDef* literal = NULL;
+OpDef* format = NULL;
 
-/*local void initOps(void) {
-	addOp2(prefix, "-", -a);
-	addOp2(prefix, "~", ~(IntNum)a);
-	addOp2(prefix, "=", dis68k(a));
+DEF_LIT(input,
+	if (isatty(0))
+		err("input number: ");
+	Num res;
+	if (scanDL(&res, stdin)==1)
+		return res;
+	THROW(4);
+);
+DEF_LIT(ans,
+	return haveAns ? ans : lit_input(str);
+);
 
-	addOp(&infix, &(OpDef){"+", op_add});
-	addOp2(infix, "-", a-b);
-	addOp2(infix, "*", a*b);
-	addOp2(infix, "/", a/b);
-	addOp2(infix, "%", DLmod(a,b));
-	addOp2(infix, ">>", (IntNum)a>>(IntNum)b);
-	addOp2(infix, "<<", (IntNum)a<<(IntNum)b);
-	addOp2(infix, "&", (IntNum)a&(IntNum)b);
-	addOp2(infix, "|", (IntNum)a|(IntNum)b);
-	addOp2(infix, "~", (IntNum)a^(IntNum)b);
-	
-	addOpS(literal, "0x", return DLread(str, 16));
-	addAlias(literal, "&h");
-	addAlias(literal, "&H");
-	addAlias(literal, "x");
-	addOpS(literal, "0b", return DLread(str, 2));
-	addAlias(literal, "&b");
-	addAlias(literal, "&B");
-	addAlias(literal, "b");
-	addOpS(literal, "0o", return DLread(str, 8));
-	addAlias(literal, "&o");
-	addAlias(literal, "&O");
-	addAlias(literal, "o");
+DEF_FMT(decimal,
+	DLprint(num, 10);
+);
 
-	addOpS(literal, "'",
-		if (**str)
-			return (Num)*((*str)++);
-		return DLnan;
-	);
-	addAlias(literal, "c");
-	addOpS(literal, "NaN", return DLnan);
-	addAlias(literal, "nan");
-	addOpS(literal, "inf", return DLinf);
-	addAlias(literal, "Inf");
-	addAlias(literal, "infinity");
-	addAlias(literal, "Infinity");
-	addOpS(literal, "a", return op_ans(str));
-	addOpS(literal, "i", return op_input(str));
-	}*/
+AUTORUN {
+	ADD_OP(literal, "i", lit_input, "get number from stdin");
+	ADD_OP(literal, "a", lit_ans, "value of previous expression");
+	ADD_OP(format, "", fmt_decimal, "default number printer");
+}
+
+
 
 local Op search(Str* str, OpDef* ops) {
 	for (; ops; ops=ops->next) {
@@ -167,9 +122,9 @@ local Num readValue(Str* str, int depth) {
 	// this only works if the expression is not otherwise valid.
 	// so, "-1" is not treated as "a-1", etc.
 	if (!depth)
-		return op_ans(NULL);
+		return lit_ans(str);
 	// Error
-	throw(1);
+	THROW(1);
 }
 
 local Num readAfter(Str* str, int depth, Num acc) {
@@ -188,7 +143,7 @@ local Num readAfter(Str* str, int depth, Num acc) {
 		return readAfter(str, depth || 1, op(acc, v));
 	}
 	// Error
-	throw(2);
+	THROW(2);
 }
 
 local Num readExpr(Str* str, int depth) {
@@ -207,48 +162,47 @@ local int doline(Str line, int interactive) {
 	int result = setjmp(env);
 	if (!result) {
 		expr = line;
+		Op printer = search(&expr, format) CRITICAL;
 		Num res = readExpr(&expr, 0); //can longjump
 		ans = res;
 		haveAns = 1;
 		if (interactive)
 			printf("> ");
-		DLprint(res, 10);
+		printer((Num)res, (int)interactive);
 		putchar('\n');
 		return 0;
 	} else { //returned via longjump
-		//if (interactive) {
-			switch (result) {
-			when(1):				
-				err("! Error: expected value (number");
-				OpDef* op;
-				for (op=literal; op; op=op->next) {
-					err(", %s", op->name);
-				}
-				err(") or prefix operator (");
-				for (op=prefix; op; op=op->next) {
-					if (op!=prefix)
-						err(", ");
-					err("%s", op->name);
-				}
-				err(")");
-			when(2):
-				err("! Error: expected operator (");
-				for (op=infix; op; op=op->next) {
-					if (op!=infix)
-						err(", ");
-					err("%s", op->name);
-				}
-				err(")");
-			when(4):
-				err("! Error: expected number from stdin");
-			otherwise:
-				err("! Unknown error: %d", result);
+		switch (result) {
+		when(1):				
+			err("! Error: expected value (number");
+			OpDef* op;
+			for (op=literal; op; op=op->next) {
+				err(", %s", op->name);
 			}
-			err("\n");
-			err("! %.*s⟨here⟩%s\n", (int)(expr-line), line, expr);
+			err(") or prefix operator (");
+			for (op=prefix; op; op=op->next) {
+				if (op!=prefix)
+					err(", ");
+				err("%s", op->name);
+			}
+			err(")");
+		when(2):
+			err("! Error: expected operator (");
+			for (op=infix; op; op=op->next) {
+				if (op!=infix)
+					err(", ");
+				err("%s", op->name);
+			}
+			err(")");
+		when(4):
+			err("! Error: expected number from stdin");
+		otherwise:
+			err("! Unknown error: %d", result);
 		}
-		return result;
-		//}
+		err("\n");
+		err("! %.*s⟨here⟩%s\n", (int)(expr-line), line, expr);
+	}
+	return result;
 }
 
 int main(int argc, Str* argv) {
