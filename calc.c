@@ -131,7 +131,6 @@ local Num readAfter(Str* str, int depth, Num acc) {
 	// End group
 	if ((*str)[0]==' ') { 
 		(*str)++;
-		printf("depth: %d\n", depth);
 		if (depth>0) //this was 1 but I think 0 is correct
 			return acc;
 	}
