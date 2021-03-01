@@ -131,7 +131,8 @@ local Num readAfter(Str* str, int depth, Num acc) {
 	// End group
 	if ((*str)[0]==' ') { 
 		(*str)++;
-		if (depth>1)
+		printf("depth: %d\n", depth);
+		if (depth>0) //this was 1 but I think 0 is correct
 			return acc;
 	}
 	if ((*str)[0]=='\0')
@@ -226,7 +227,6 @@ int main(int argc, Str* argv) {
 		free(line);
 		return err;
 	}
-	//	loadReadline();
 	using_history();
 	while (1) {
 		Str line = readline("<< ");
