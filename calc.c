@@ -98,7 +98,7 @@ local Num readValue(Str* str, int depth) {
 	// Start group
 	if ((*str)[0]==' ') { 
 		(*str)++;
-		return readExpr(str, (depth || 1)+1);
+		return readExpr(str, (depth ?: 1)+1);
 	}
 	// literal/vars
 	Op op = search(str, literal);
@@ -116,7 +116,7 @@ local Num readValue(Str* str, int depth) {
 	// Prefix Operator
 	op = search(str, prefix);
 	if (op)
-		return op(readValue(str, depth || 1), 0);
+		return op(readValue(str, depth ?: 1), 0);
 	// Implicit value (top level only)
 	// "+1" is treated as "a+1", etc.
 	// this only works if the expression is not otherwise valid.
@@ -131,7 +131,7 @@ local Num readAfter(Str* str, int depth, Num acc) {
 	// End group
 	if ((*str)[0]==' ') { 
 		(*str)++;
-		if (depth>0) //this was 1 but I think 0 is correct
+		if (depth>1)
 			return acc;
 	}
 	if ((*str)[0]=='\0')
@@ -139,8 +139,8 @@ local Num readAfter(Str* str, int depth, Num acc) {
 	// Infix Operator
 	Op op = search(str, infix);
 	if (op) {
-		Num v = readValue(str, depth || 1);
-		return readAfter(str, depth || 1, op(acc, v));
+		Num v = readValue(str, depth ?: 1);
+		return readAfter(str, depth ?: 1, op(acc, v));
 	}
 	// Error
 	THROW(2);
@@ -148,7 +148,7 @@ local Num readAfter(Str* str, int depth, Num acc) {
 
 local Num readExpr(Str* str, int depth) {
 	Num acc = readValue(str, depth);
-	return readAfter(str, depth || 1, acc);
+	return readAfter(str, depth ?: 1, acc);
 }
 
 local int doline(Str line, int interactive) {
@@ -216,12 +216,12 @@ int main(int argc, Str* argv) {
 		while (1) {
 			c = getline(&line, &n, stdin);
 			if (c<0) {
-				err = err || errno;
+				err = err ?: errno;
 				break;
 			}
 			if (line[c-1]=='\n')
 				line[c-1] = '\0';
-			err = err || doline(line, 0);
+			err = err ?: doline(line, 0);
 		}
 		free(line);
 		return err;
