@@ -32,5 +32,5 @@ extern OpDef* format;
 
 OpDef* addOp(OpDef** list, OpDef* def);
 #define ADD_OP(list, args...) addOp(&(list), &(OpDef){ args });
-void addAlias(OpDef** list, Str name);
-#define ADD_ALIAS(list, name) addAlias(&(list), name);
+//void addAlias(OpDef** list, Str name);
+//#define ADD_ALIAS(list, name) addAlias(&(list), name);

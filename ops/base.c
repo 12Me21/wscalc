@@ -2,9 +2,9 @@
 
 local Num readBase(Str* str, int base) {
 	Str start = *str;
-	Num ret = DLread(str, 16);
+	Num ret = DLread(str, base);
 	if (start == *str)
-		THROW(8);
+		THROW(8); // todo: define this error
 	return ret;
 }
 
@@ -27,19 +27,20 @@ DEF_FMT(bin,
 
 AUTORUN {
 	ADD_OP(literal, "0x", lit_hex, "Hexadecimal prefix");
-	ADD_ALIAS(literal, "x");
-	ADD_ALIAS(literal, "&h");
-	ADD_ALIAS(literal, "&H");
+	ADD_OP(literal, "x", lit_hex, "Hexadecimal prefix");
+	ADD_OP(literal, "&h", lit_hex, "Hexadecimal prefix");
+	ADD_OP(literal, "&H", lit_hex, "Hexadecimal prefix");
+	ADD_OP(literal, "&", lit_oct, "Hexadecimal prefix");
 	
 	ADD_OP(literal, "0o", lit_oct, "Octal prefix");
-	ADD_ALIAS(literal, "o");
-	ADD_ALIAS(literal, "&o");
-	ADD_ALIAS(literal, "&O");
+	ADD_OP(literal, "o", lit_oct, "Octal prefix");
+	ADD_OP(literal, "&o", lit_oct, "Octal prefix");
+	ADD_OP(literal, "&O", lit_oct, "Octal prefix");
 
 	ADD_OP(literal, "0b", lit_bin, "Binary prefix");
-	ADD_ALIAS(literal, "b");
-	ADD_ALIAS(literal, "&b");
-	ADD_ALIAS(literal, "&B");
+	ADD_OP(literal, "b", lit_bin, "Binary prefix");
+	ADD_OP(literal, "&b", lit_bin, "Binary prefix");
+	ADD_OP(literal, "&B", lit_bin, "Binary prefix");
 
 	ADD_OP(format, "?x", fmt_hex, "Print in hexadecimal");
 	ADD_OP(format, "?b", fmt_bin, "Print in binary");

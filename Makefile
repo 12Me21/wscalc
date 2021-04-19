@@ -18,3 +18,4 @@ include .Nice.mk
 #%.so: %.c
 #	$(cc) $(CFLAGS) -c -fPIC $< -o $(junkdir)/$(@:.so=.o)f
 #	ld -shared $(junkdir)/$(@:.so=.o) -o $@ calc
+#❤️💚💙

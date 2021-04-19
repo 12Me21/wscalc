@@ -31,26 +31,43 @@ void throw(int err) {
 // as well as encouraging reuse of error messages
 }
 
-OpDef* addOp(OpDef** list, OpDef* def) {
+OpDef* addOp(OpDef** listp, OpDef* def) {
 	//printf("adding op %s\n", def->name);
-	list CRITICAL;
+	listp CRITICAL;
 	def CRITICAL;
 	def->name CRITICAL;
 	def->func CRITICAL;
 	
 	OpDef* ALLOC(new);
 	*new = *def;
-	new->next = *list;
-	*list = new;
+
+	// keep list sorted by descending name length
+	OpDef* prev = NULL;
+	size_t len = strlen(def->name);
+	OpDef* next = *listp;
+	while (next && strlen(next->name) > len) {
+		prev = next;
+		next = next->next;
+	}
+
+	// insert item
+	if (prev)
+		prev->next = new;
+	new->next = next;
+	if (next == *listp) // if replacing list head
+		*listp = new;
+	
 	return new;
 }
 
+/*
+this is broken now because of sorting
 void addAlias(OpDef** list, Str name) {
 	list CRITICAL;
 	name CRITICAL;
 	
 	addOp(list, *list)->name = name;
-}
+}*/
 
 OpDef* prefix = NULL;
 OpDef* infix = NULL;
