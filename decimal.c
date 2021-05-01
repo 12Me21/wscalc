@@ -160,9 +160,9 @@ void DLprint(Num num, int base) {
 	}
 	for (; place>0; place/=base) {
 		/*if (place > num)
-			continue;
-		if (!num)
-		break;*/
+		  continue;
+		  if (!num)
+		  break;*/
 		int digit;
 		for (digit=0; digit<base; digit++) {
 			if (num < place)

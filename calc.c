@@ -24,11 +24,11 @@ int haveAns = 0;
 jmp_buf env;
 
 void throw(int err) {
-//todo: allow defining error strings somehow
-// maybe have throw take err message string,
-// or, allow allocating messages beforehand and use int handles.
-// this could make, for example, translation easier
-// as well as encouraging reuse of error messages
+	//todo: allow defining error strings somehow
+	// maybe have throw take err message string,
+	// or, allow allocating messages beforehand and use int handles.
+	// this could make, for example, translation easier
+	// as well as encouraging reuse of error messages
 }
 
 OpDef* addOp(OpDef** listp, OpDef* def) {
@@ -40,7 +40,7 @@ OpDef* addOp(OpDef** listp, OpDef* def) {
 	
 	OpDef* ALLOC(new);
 	*new = *def;
-
+	
 	// keep list sorted by descending name length
 	OpDef* prev = NULL;
 	size_t len = strlen(def->name);
@@ -49,7 +49,7 @@ OpDef* addOp(OpDef** listp, OpDef* def) {
 		prev = next;
 		next = next->next;
 	}
-
+	
 	// insert item
 	if (prev)
 		prev->next = new;
@@ -61,13 +61,13 @@ OpDef* addOp(OpDef** listp, OpDef* def) {
 }
 
 /*
-this is broken now because of sorting
-void addAlias(OpDef** list, Str name) {
-	list CRITICAL;
-	name CRITICAL;
+  this is broken now because of sorting
+  void addAlias(OpDef** list, Str name) {
+  list CRITICAL;
+  name CRITICAL;
 	
-	addOp(list, *list)->name = name;
-}*/
+  addOp(list, *list)->name = name;
+  }*/
 
 OpDef* prefix = NULL;
 OpDef* infix = NULL;
@@ -75,20 +75,20 @@ OpDef* literal = NULL;
 OpDef* format = NULL;
 
 DEF_LIT(input,
-	if (isatty(0))
-		err("input number: ");
-	Num res;
-	if (scanDL(&res, stdin)==1)
-		return res;
-	THROW(4);
-);
+        if (isatty(0))
+	        err("input number: ");
+        Num res;
+        if (scanDL(&res, stdin)==1)
+	        return res;
+        THROW(4);
+        );
 DEF_LIT(ans,
-	return haveAns ? ans : lit_input(str);
-);
+        return haveAns ? ans : lit_input(str);
+        );
 
 DEF_FMT(decimal,
-	DLprint(num, 10);
-);
+        DLprint(num, 10);
+        );
 
 AUTORUN {
 	ADD_OP(literal, "i", lit_input, "get number from stdin");
