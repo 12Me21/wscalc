@@ -25,6 +25,12 @@ DEF_FMT(bin,
 	DLprint(num, 2);
 );
 
+DEF_FMT(oct,
+	if (interactive)
+		printf("0o");
+	DLprint(num, 8);
+);
+
 AUTORUN {
 	ADD_OP(literal, "0x", lit_hex, "Hexadecimal prefix");
 	ADD_OP(literal, "x", lit_hex, "Hexadecimal prefix");
@@ -43,5 +49,6 @@ AUTORUN {
 	ADD_OP(literal, "&B", lit_bin, "Binary prefix");
 
 	ADD_OP(format, "?x", fmt_hex, "Print in hexadecimal");
+	ADD_OP(format, "?o", fmt_oct, "Print in octal");
 	ADD_OP(format, "?b", fmt_bin, "Print in binary");
 }
